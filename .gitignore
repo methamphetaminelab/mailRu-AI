@@ -1,0 +1,4 @@
+.vscode/
+__pycache__/
+auth_info.txt
+har_and_cookies/
