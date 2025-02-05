@@ -65,10 +65,10 @@ def process_question(client: OtvetClient, g4f_client: Client, question_id: Quest
     if not question.poll_type:
         try:
             system_prompt = (
-                "You are a qualified expert, always providing detailed and accurate answers. "
-                "Please answer as thoroughly, concisely, and argumentatively as possible in English."
+                "Ты квалифицированный эксперт, всегда дающий подробные и точные ответы. "
+                "Ответь максимально подробно, кратко, аргументированно и на русском языке."
             )
-            user_prompt = f"TITLE: {question.title}\nQUESTION: {question.text}"
+            user_prompt = f"ЗАГОЛОВОК: {question.title}\nВОПРОС: {question.text}"
             
             response = g4f_client.chat.completions.create(
                 model=llama_3_3_70b,
