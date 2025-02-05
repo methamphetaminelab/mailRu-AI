@@ -1,4 +1,5 @@
 from otvetmailru import OtvetClient
+from otvetmailru.models import QuestionPreview
 from g4f.client import Client
 from g4f.Provider import Blackbox
 from g4f.models import llama_3_3_70b
@@ -10,9 +11,7 @@ from typing import Dict
 import os
 import random
 import re
-
-console = Console()
-AUTH_FILE = 'auth_info.txt'
+import sys
 
 def authenticate_client() -> Dict[OtvetClient, Client]:
     client = None
@@ -38,26 +37,26 @@ def contains_link_or_image(text: str) -> bool:
     image_pattern = re.compile(r'!\[.*\]\(.*\)|<img\s+[^>]*src="[^"]+"')
     return bool(url_pattern.search(text) or image_pattern.search(text))
 
-def process_question(client, g4f_client, question_id) -> None:
+def process_question(client: OtvetClient, g4f_client: Client, question_id: QuestionPreview) -> None:
     question = client.get_question(question_id)
     if not question.can_answer:
         return
 
     if contains_link_or_image(question.title) or contains_link_or_image(question.text):
-        console.print("[bold yellow]Вопрос пропущен, так как содержит ссылку или изображение.[/bold yellow]\n")
+        console.print("[bold yellow]Question skipped because it contains a link or image.[/bold yellow]\n")
         return
 
     header = Text()
-    header.append("Автор: ", style="bold yellow")
+    header.append("Author: ", style="bold yellow")
     header.append(f"{question.author.name}  ")
-    header.append("| Категория: ", style="bold yellow")
+    header.append("| Category: ", style="bold yellow")
     header.append(f"{question.category.name}")
 
     url_text = Text.assemble(("URL: ", "bold green"), (question.url, "underline blue"))
-    title_text = Text.assemble(("Заголовок: ", "bold magenta"), (question.title, "italic"))
-    question_panel = Panel(question.text, title="Текст вопроса", title_align="left", style="cyan")
+    title_text = Text.assemble(("Title: ", "bold magenta"), (question.title, "italic"))
+    question_panel = Panel(question.text, title="Question Text", title_align="left", style="cyan")
 
-    console.rule("[bold red]Новый вопрос[/bold red]")
+    console.rule("[bold red]New Question[/bold red]")
     console.print(header)
     console.print(url_text)
     console.print(title_text)
@@ -66,10 +65,10 @@ def process_question(client, g4f_client, question_id) -> None:
     if not question.poll_type:
         try:
             system_prompt = (
-                "Ты квалифицированный эксперт, всегда дающий подробные и точные ответы. "
-                "Ответь максимально подробно, кратко, аргументированно и на русском языке."
+                "You are a qualified expert, always providing detailed and accurate answers. "
+                "Please answer as thoroughly, concisely, and argumentatively as possible in English."
             )
-            user_prompt = f"ЗАГОЛОВОК: {question.title}\nВОПРОС: {question.text}"
+            user_prompt = f"TITLE: {question.title}\nQUESTION: {question.text}"
             
             response = g4f_client.chat.completions.create(
                 model=llama_3_3_70b,
@@ -82,21 +81,22 @@ def process_question(client, g4f_client, question_id) -> None:
             )
             
             ai_answer = response.choices[0].message.content.strip()
-            answer_panel = Panel(ai_answer, title="Ответ от ИИ", title_align="left", style="green")
+            answer_panel = Panel(ai_answer, title="AI Answer", title_align="left", style="green")
             console.print(answer_panel)
             
             client.add_answer(question, ai_answer)
             
         except Exception as e:
-            if "limits exceeded: AAQ" in str(e) or "Expecting value" in str(e):
-                client.add_answer(question, ai_answer)
-                console.print("[bold green]Ответ опубликован автоматически.[/bold green]\n")
+            if "limits exceeded: AAQ" in str(e):
+                console.print("[bold red]Account has reached the daily answer limit.[/bold red]\n")
+                sys.exit(1)
             else:
-                console.print(f"[bold red]Ошибка при запросе к ИИ: {e}[/bold red]\n")
+                console.print(f"[bold red]Error in AI request: {e}[/bold red]\n")
+                sys.exit(1)
     else:
-        poll_table = Table(title="Опрос", show_header=True, header_style="bold blue")
-        poll_table.add_column("№", justify="center")
-        poll_table.add_column("Вариант ответа", justify="left")
+        poll_table = Table(title="Poll", show_header=True, header_style="bold blue")
+        poll_table.add_column("No.", justify="center")
+        poll_table.add_column("Answer Option", justify="left")
         for i, option in enumerate(question.poll.options, 1):
             poll_table.add_row(str(i), option.text)
         console.print(poll_table)
@@ -108,21 +108,21 @@ def process_question(client, g4f_client, question_id) -> None:
             )
             selected = [question.poll.options[i - 1] for i in vote_indices]
             client.vote_in_poll(question, selected)
-            console.print("[bold green]Голос учтён автоматически.[/bold green]\n")
+            console.print("[bold green]Vote recorded automatically.[/bold green]\n")
         except Exception as e:
-            console.print(f"[bold red]Ошибка при голосовании: {e}[/bold red]\n")
+            console.print(f"[bold red]Error while voting: {e}[/bold red]\n")
 
 def main() -> None:
     client, g4f_client = authenticate_client()
     me = client.get_user()
     
     profile_info = (
-        f"[bold yellow]Пользователь ID:[/bold yellow] {client.user_id}\n"
-        f"[bold yellow]Имя:[/bold yellow] {me.name}\n"
-        f"[bold yellow]Рейтинг:[/bold yellow] {me.rate.name}\n"
-        f"[bold yellow]Профиль:[/bold yellow] [underline blue]{me.url}[/underline blue]"
+        f"[bold yellow]User ID:[/bold yellow] {client.user_id}\n"
+        f"[bold yellow]Name:[/bold yellow] {me.name}\n"
+        f"[bold yellow]Rating:[/bold yellow] {me.rate.name}\n"
+        f"[bold yellow]Profile:[/bold yellow] [underline blue]{me.url}[/underline blue]"
     )
-    profile_panel = Panel(profile_info, title="Профиль пользователя", style="magenta")
+    profile_panel = Panel(profile_info, title="User Profile", style="magenta")
     console.print(profile_panel)
     
     for questions in client.iterate_new_questions():
@@ -130,4 +130,6 @@ def main() -> None:
             process_question(client, g4f_client, question_id)
 
 if __name__ == '__main__':
+    console = Console()
+    AUTH_FILE = 'auth_info.txt'
     main()
