@@ -16,7 +16,7 @@ import re
 import os
 
 AUTH_FILE = "accounts.json"
-PROGRAM_VERSION = "1.1.4b"
+PROGRAM_VERSION = "1.1.4c"
 PROGRAM_NAME = "mailRu AI"
 console = Console()
 
@@ -87,8 +87,6 @@ def select_account() -> OtvetClient:
             console.print("\n[bold]Доступные аккаунты:[/bold]")
             for i, account in enumerate(accounts, 1):
                 console.print(f"[{i}] {account['email']}")
-            console.print("[a] Добавить новый аккаунт")
-            console.print("[r] Удалить аккаунт")
             choice = console.input("Выберите номер аккаунта или введите 'a' для добавления, 'r' для удаления: ").strip().lower()
 
             if choice == "a":
